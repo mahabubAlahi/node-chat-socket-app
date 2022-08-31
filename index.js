@@ -3,6 +3,7 @@ const http = require('http');
 const express = require("express");
 const socketio = require('socket.io');
 const formatMessage = require('./utils/messages')
+const {userJoin, getCurrentUser} = require('./utils/users')
 
 const app = express();
 const server = http.createServer(app)
@@ -16,22 +17,29 @@ const botName = 'Admin'
 app.use(express.static(path.join(__dirname, "public")));
 
 io.on('connection', socket => {
-    console.log("New Ws Connection")
 
-    // Welcome current user
-    socket.emit('message', formatMessage(botName, 'Welcome to the chat app'));
+    socket.on('joinRoom', ({ username, room }) => {
 
-    // Broadcast when a new user connects
-    socket.broadcast.emit('message', formatMessage(botName, 'A new user has joined the chat'));
+        const user = userJoin(socket.id, username, room);
 
-    //Runs when client disconnects
-    socket.on('disconnect', () => {
-        io.emit('message', formatMessage(botName, 'A user has left the chat'))
+        socket.join(user.room)
+
+        // Welcome current user
+        socket.emit('message', formatMessage(botName, 'Welcome to the chat app'));
+
+        // Broadcast when a new user connects
+        socket.broadcast.to(user.room).emit('message', formatMessage(botName, `${user.username} has joined the chat`));
+
     })
 
     // Listening Chat message
     socket.on('chatMessage', chatMessage => {
         io.emit('message', formatMessage('USER', chatMessage));
+    })
+
+    //Runs when client disconnects
+    socket.on('disconnect', () => {
+        io.emit('message', formatMessage(botName, 'A user has left the chat'))
     })
 })
 
